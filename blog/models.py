@@ -9,6 +9,9 @@ class User(models.Model):
     bio = models.TextField(blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 
+    class Meta:
+        indexes = [models.Index(fields=["email"], name="user_email_idx")]
+
     def __str__(self) -> str:
         return self.username
 
@@ -32,6 +35,15 @@ class Post(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     tags = models.ManyToManyField(Tag, related_name="posts", blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["-created_at"],
+                name="post_published_created_idx",
+                condition=models.Q(is_published=True),
+            ),
+        ]
+
     def __str__(self) -> str:
         return self.title
 
@@ -41,3 +53,8 @@ class Comment(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments")
     body = models.TextField()
     created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["post", "created_at"], name="comment_post_created_idx"),
+        ]

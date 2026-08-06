@@ -83,3 +83,6 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+NINJA_PAGINATION_PER_PAGE = 20
+NINJA_PAGINATION_MAX_LIMIT = 100

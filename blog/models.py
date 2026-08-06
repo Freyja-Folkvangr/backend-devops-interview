@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
 from django.utils import timezone
 
@@ -40,6 +41,16 @@ class Post(models.Model):
             models.Index(
                 fields=["-created_at"],
                 name="post_published_created_idx",
+                condition=models.Q(is_published=True),
+            ),
+            GinIndex(
+                OpClass(models.F("title"), name="gin_trgm_ops"),
+                name="post_title_trgm_idx",
+                condition=models.Q(is_published=True),
+            ),
+            GinIndex(
+                OpClass(models.F("body"), name="gin_trgm_ops"),
+                name="post_body_trgm_idx",
                 condition=models.Q(is_published=True),
             ),
         ]

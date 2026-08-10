@@ -1,0 +1,14 @@
+.git
+.venv
+.env
+*.env
+!.env.example
+wiki/
+CLAUDE.md
+NOTES.md
+staticfiles/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.DS_Store

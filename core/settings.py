@@ -7,9 +7,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = "django-insecure-9!^p2zr8m=k$d3v0&xq+1wybho4ag&7lcfu+ej(nti6r%h@m4s"
+DEBUG = env.bool("DEBUG", default=True)
 
-DEBUG = True
+if DEBUG:
+    SECRET_KEY = env(
+        "SECRET_KEY",
+        default="django-insecure-9!^p2zr8m=k$d3v0&xq+1wybho4ag&7lcfu+ej(nti6r%h@m4s",
+    )
+else:
+    SECRET_KEY = env("SECRET_KEY")
 
 ALLOWED_HOSTS = ["*"]
 

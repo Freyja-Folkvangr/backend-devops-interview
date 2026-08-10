@@ -2,6 +2,7 @@ import json
 from datetime import timedelta
 
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from blog.models import Comment, Post, Tag, User
@@ -44,13 +45,13 @@ class PostEndpointsTests(TestCase):
         cls.draft.tags.add(cls.tag_dj)
 
     def test_list_returns_only_published_newest_first(self):
-        resp = self.client.get("/api/posts")
+        resp = self.client.get(reverse("api-1.0.0:list_posts"))
         self.assertEqual(resp.status_code, 200)
         titles = [p["title"] for p in resp.json()]
         self.assertEqual(titles, ["Newer published", "Older published"])
 
     def test_list_item_shape(self):
-        item = self.client.get("/api/posts").json()[0]
+        item = self.client.get(reverse("api-1.0.0:list_posts")).json()[0]
         self.assertEqual(
             set(item.keys()),
             {"id", "title", "author", "tags", "view_count", "created_at"},
@@ -60,46 +61,48 @@ class PostEndpointsTests(TestCase):
 
     def test_list_empty_returns_empty_list(self):
         Post.objects.all().delete()
-        self.assertEqual(self.client.get("/api/posts").json(), [])
+        self.assertEqual(self.client.get(reverse("api-1.0.0:list_posts")).json(), [])
 
     def test_search_matches_title_and_body_case_insensitive(self):
+        url = reverse("api-1.0.0:search_posts")
         self.assertEqual(
-            [p["title"] for p in self.client.get("/api/posts/search", {"q": "BETA"}).json()],
+            [p["title"] for p in self.client.get(url, {"q": "BETA"}).json()],
             ["Newer published"],
         )
         self.assertEqual(
-            [p["title"] for p in self.client.get("/api/posts/search", {"q": "published"}).json()],
+            [p["title"] for p in self.client.get(url, {"q": "published"}).json()],
             ["Newer published", "Older published"],
         )
 
     def test_search_excludes_unpublished(self):
         # "unpublished" only appears in the draft body, which must be filtered out
-        self.assertEqual(self.client.get("/api/posts/search", {"q": "unpublished"}).json(), [])
+        url = reverse("api-1.0.0:search_posts")
+        self.assertEqual(self.client.get(url, {"q": "unpublished"}).json(), [])
 
     def test_search_empty_q_returns_all_published(self):
         # Refs #6 (intentional): empty q -> ILIKE '%%' matches every published post
+        url = reverse("api-1.0.0:search_posts")
         self.assertEqual(
-            [p["title"] for p in self.client.get("/api/posts/search", {"q": ""}).json()],
+            [p["title"] for p in self.client.get(url, {"q": ""}).json()],
             ["Newer published", "Older published"],
         )
 
     def test_search_missing_q_returns_422(self):
-        self.assertEqual(self.client.get("/api/posts/search").status_code, 422)
+        self.assertEqual(self.client.get(reverse("api-1.0.0:search_posts")).status_code, 422)
 
     def test_by_tag_returns_published_newest_first(self):
-        resp = self.client.get("/api/posts/by-tag/python")
+        resp = self.client.get(reverse("api-1.0.0:posts_by_tag", args=["python"]))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual([p["title"] for p in resp.json()], ["Newer published", "Older published"])
 
     def test_by_tag_excludes_unpublished(self):
         # the draft carries the "django" tag but must not appear
-        self.assertEqual(
-            [p["title"] for p in self.client.get("/api/posts/by-tag/django").json()],
-            ["Newer published"],
-        )
+        resp = self.client.get(reverse("api-1.0.0:posts_by_tag", args=["django"]))
+        self.assertEqual([p["title"] for p in resp.json()], ["Newer published"])
 
     def test_by_tag_unknown_slug_404(self):
-        self.assertEqual(self.client.get("/api/posts/by-tag/nope").status_code, 404)
+        resp = self.client.get(reverse("api-1.0.0:posts_by_tag", args=["nope"]))
+        self.assertEqual(resp.status_code, 404)
 
     def test_get_post_detail_shape_and_comment_order(self):
         Comment.objects.create(
@@ -111,7 +114,7 @@ class PostEndpointsTests(TestCase):
         Comment.objects.create(
             post=self.newer, author=self.author, body="second", created_at=timezone.now()
         )
-        data = self.client.get(f"/api/posts/{self.newer.id}").json()
+        data = self.client.get(reverse("api-1.0.0:get_post", args=[self.newer.id])).json()
         self.assertEqual(
             set(data.keys()),
             {
@@ -130,18 +133,20 @@ class PostEndpointsTests(TestCase):
 
     def test_get_post_increments_view_count_each_call(self):
         # Refs #2 (intentional): GET is non-idempotent
-        first = self.client.get(f"/api/posts/{self.newer.id}").json()["view_count"]
-        second = self.client.get(f"/api/posts/{self.newer.id}").json()["view_count"]
+        url = reverse("api-1.0.0:get_post", args=[self.newer.id])
+        first = self.client.get(url).json()["view_count"]
+        second = self.client.get(url).json()["view_count"]
         self.assertEqual((first, second), (1, 2))
 
     def test_get_post_returns_unpublished_draft(self):
         # Refs #3 (intentional): detail has no is_published filter
-        resp = self.client.get(f"/api/posts/{self.draft.id}")
+        resp = self.client.get(reverse("api-1.0.0:get_post", args=[self.draft.id]))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["title"], "Secret draft")
 
     def test_get_post_unknown_id_404(self):
-        self.assertEqual(self.client.get("/api/posts/99999").status_code, 404)
+        resp = self.client.get(reverse("api-1.0.0:get_post", args=[99999]))
+        self.assertEqual(resp.status_code, 404)
 
     def test_create_post_returns_id_and_title(self):
         payload = {
@@ -151,7 +156,9 @@ class PostEndpointsTests(TestCase):
             "tag_slugs": ["python"],
         }
         resp = self.client.post(
-            "/api/posts", data=json.dumps(payload), content_type="application/json"
+            reverse("api-1.0.0:create_post"),
+            data=json.dumps(payload),
+            content_type="application/json",
         )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -160,7 +167,7 @@ class PostEndpointsTests(TestCase):
 
     def test_create_post_unknown_author_404(self):
         resp = self.client.post(
-            "/api/posts",
+            reverse("api-1.0.0:create_post"),
             data=json.dumps({"author_id": 99999, "title": "X", "body": "b"}),
             content_type="application/json",
         )
@@ -177,6 +184,8 @@ class PostEndpointsTests(TestCase):
         }
         with self.assertRaises(Tag.DoesNotExist):
             self.client.post(
-                "/api/posts", data=json.dumps(payload), content_type="application/json"
+                reverse("api-1.0.0:create_post"),
+                data=json.dumps(payload),
+                content_type="application/json",
             )
         self.assertTrue(Post.objects.filter(title="Orphan").exists())

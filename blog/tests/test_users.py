@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.urls import reverse
 
 from blog.models import Comment, Post, User
 
@@ -15,7 +16,7 @@ class UserEndpointsTests(TestCase):
         Comment.objects.create(post=draft, author=cls.user, body="c2")
 
     def test_get_user_detail_shape(self):
-        resp = self.client.get(f"/api/users/{self.user.id}")
+        resp = self.client.get(reverse("api-1.0.0:get_user", args=[self.user.id]))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(
             set(resp.json().keys()),
@@ -23,33 +24,36 @@ class UserEndpointsTests(TestCase):
         )
 
     def test_get_user_unknown_404(self):
-        self.assertEqual(self.client.get("/api/users/99999").status_code, 404)
+        resp = self.client.get(reverse("api-1.0.0:get_user", args=[99999]))
+        self.assertEqual(resp.status_code, 404)
 
     def test_find_user_by_email_ok(self):
-        resp = self.client.get("/api/users/find", {"email": "carol@example.com"})
+        url = reverse("api-1.0.0:find_user_by_email")
+        resp = self.client.get(url, {"email": "carol@example.com"})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["username"], "carol")
 
     def test_find_user_by_email_missing_param_422(self):
-        self.assertEqual(self.client.get("/api/users/find").status_code, 422)
+        self.assertEqual(self.client.get(reverse("api-1.0.0:find_user_by_email")).status_code, 422)
 
     def test_find_user_by_email_unknown_404(self):
-        resp = self.client.get("/api/users/find", {"email": "nobody@example.com"})
+        url = reverse("api-1.0.0:find_user_by_email")
+        resp = self.client.get(url, {"email": "nobody@example.com"})
         self.assertEqual(resp.status_code, 404)
 
     def test_find_user_by_email_duplicate_raises(self):
         # Refs #5 (intentional): email is not unique -> MultipleObjectsReturned
         User.objects.create(username="carol2", email="carol@example.com", display_name="Carol2")
+        url = reverse("api-1.0.0:find_user_by_email")
         with self.assertRaises(User.MultipleObjectsReturned):
-            self.client.get("/api/users/find", {"email": "carol@example.com"})
+            self.client.get(url, {"email": "carol@example.com"})
 
     def test_user_counts_include_unpublished(self):
         # Refs #7 (intentional): counts ignore is_published (post + comment on a draft)
-        data = self.client.get(f"/api/users/{self.user.id}").json()
+        data = self.client.get(reverse("api-1.0.0:get_user", args=[self.user.id])).json()
         self.assertEqual((data["post_count"], data["comment_count"]), (2, 2))
 
     def test_find_resolves_before_user_id_route(self):
         # /users/find must match the static route, not be parsed as {user_id}
-        self.assertEqual(
-            self.client.get("/api/users/find", {"email": "carol@example.com"}).status_code, 200
-        )
+        url = reverse("api-1.0.0:find_user_by_email")
+        self.assertEqual(self.client.get(url, {"email": "carol@example.com"}).status_code, 200)

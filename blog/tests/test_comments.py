@@ -1,6 +1,7 @@
 import json
 
 from django.test import TestCase
+from django.urls import reverse
 
 from blog.models import Comment, Post, User
 
@@ -14,7 +15,7 @@ class CommentEndpointsTests(TestCase):
 
     def _post_comment(self, post_id, author_id, body):
         return self.client.post(
-            f"/api/posts/{post_id}/comments",
+            reverse("api-1.0.0:create_comment", args=[post_id]),
             data=json.dumps({"author_id": author_id, "body": body}),
             content_type="application/json",
         )

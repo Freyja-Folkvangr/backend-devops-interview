@@ -11,8 +11,8 @@ api.add_router("/", blog_router)
 api.add_router("/v2/", blog_v2_router)
 
 urlpatterns = [
-    path("health/live", live),
-    path("health/ready", ready),
+    path("livez", live, name="livez"),
+    path("readyz", ready, name="readyz"),
     path("admin/", admin.site.urls),
     path("api/", api.urls),
 ]

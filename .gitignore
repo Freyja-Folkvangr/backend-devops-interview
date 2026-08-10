@@ -6,3 +6,8 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 *.sqlite3
+
+# Local env & agent working files (not part of the deliverable)
+.env
+CLAUDE.md
+wiki/

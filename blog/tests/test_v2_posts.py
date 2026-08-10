@@ -45,6 +45,22 @@ class V2PostsTests(TestCase):
         self.assertEqual(len(page2), 5)
         self.assertEqual(set(p["id"] for p in page1) & set(p["id"] for p in page2), set())
 
+    def test_last_page_is_partial(self):
+        data = self.client.get("/api/v2/posts", {"limit": 10, "offset": 20}).json()
+        self.assertEqual(data["count"], 25)
+        self.assertEqual(len(data["items"]), 5)
+
+    def test_offset_beyond_total_returns_no_items(self):
+        data = self.client.get("/api/v2/posts", {"limit": 10, "offset": 30}).json()
+        self.assertEqual(data["count"], 25)
+        self.assertEqual(data["items"], [])
+
+    def test_empty_dataset_returns_empty_envelope(self):
+        Post.objects.all().delete()
+        data = self.client.get("/api/v2/posts").json()
+        self.assertEqual(data["count"], 0)
+        self.assertEqual(data["items"], [])
+
     def test_deterministic_order_newest_first(self):
         titles = [
             p["title"] for p in self.client.get("/api/v2/posts", {"limit": 3}).json()["items"]
@@ -59,6 +75,10 @@ class V2PostsTests(TestCase):
 
     def test_limit_over_max_is_rejected(self):
         self.assertEqual(self.client.get("/api/v2/posts", {"limit": 1000}).status_code, 422)
+
+    def test_limit_just_above_max_is_rejected(self):
+        # NINJA_PAGINATION_MAX_LIMIT = 100, enforced as a `le` on the pagination input
+        self.assertEqual(self.client.get("/api/v2/posts", {"limit": 101}).status_code, 422)
 
     def test_search_paginated(self):
         data = self.client.get("/api/v2/posts/search", {"q": "keyword", "limit": 10}).json()
